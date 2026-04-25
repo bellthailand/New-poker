@@ -1,0 +1,148 @@
+import React, { useState, useMemo } from 'react';
+
+// --- ชุดข้อมูลไพ่มาตรฐาน ---
+const suits = ['♠', '♣', '♥', '♦'];
+const ranks = ['A', 'K', 'Q', 'J', 'T', '9', '8', '7', '6', '5', '4', '3', '2'];
+const DECK = ranks.flatMap(rank => suits.map(suit => ({ rank, suit, id: `${rank}${suit}` })));
+
+const PokerAnalyzerApp = () => {
+  // --- States เก็บข้อมูลไพ่และเบต ---
+  const [boardCards, setBoardCards] = useState([]); // เก็บไพ่บนโต๊ะ (สูงสุด 5)
+  const [heroCards, setHeroCards] = useState([]);   // เก็บไพ่ในมือเรา (สูงสุด 2)
+  const [betSize, setBetSize] = useState(50);      // ค่าเริ่มต้น 50%
+  const [activeSelection, setActiveSelection] = useState('board'); // เลือกใส่ที่ Board หรือ Hero
+
+  // --- ปุ่ม Bet Size ที่คุณเบลสั่งเพิ่ม (5%, 10%, 90% อยู่ครบ) ---
+  const sizes = [5, 10, 25, 33, 50, 75, 90, 100];
+
+  // --- คำนวณ Pot Odds อัตโนมัติ ---
+  const potOdds = useMemo(() => {
+    const callAmount = betSize;
+    const totalPotAfterCall = 100 + betSize + callAmount;
+    return ((callAmount / totalPotAfterCall) * 100).toFixed(1);
+  }, [betSize]);
+
+  // --- ฟังก์ชันเลือกไพ่ (มีระบบกันเลือกซ้ำ) ---
+  const handleCardClick = (card) => {
+    // เช็คก่อนว่าไพ่ใบนี้ถูกเลือกไปหรือยัง
+    const alreadySelected = [...boardCards, ...heroCards].some(c => c.id === card.id);
+    if (alreadySelected) return;
+
+    if (activeSelection === 'board' && boardCards.length < 5) {
+      setBoardCards([...boardCards, card]);
+    } else if (activeSelection === 'hero' && heroCards.length < 2) {
+      setHeroCards([...heroCards, card]);
+    }
+  };
+
+  const removeCard = (type, id) => {
+    if (type === 'board') setBoardCards(boardCards.filter(c => c.id !== id));
+    if (type === 'hero') setHeroCards(heroCards.filter(c => c.id !== id));
+  };
+
+  return (
+    <div className="min-h-screen bg-[#0f121a] text-white p-4">
+      <div className="max-w-md mx-auto space-y-4">
+        
+        {/* --- ส่วนที่ 1: BOARD CARDS --- */}
+        <div className={`p-4 rounded-xl border ${activeSelection === 'board' ? 'border-orange-500/50 bg-[#1a1f2e]' : 'border-gray-800 bg-[#151924]'}`}
+             onClick={() => setActiveSelection('board')}>
+          <h3 className="text-[10px] uppercase tracking-widest text-gray-400 mb-2">Board Cards (3-5)</h3>
+          <div className="flex gap-2 mb-4">
+            {[0, 1, 2, 3, 4].map(i => (
+              <div key={i} className="w-12 h-16 border border-dashed border-gray-600 rounded flex items-center justify-center relative bg-gray-900/50">
+                {boardCards[i] ? (
+                  <div className={`text-lg font-bold ${['♥','♦'].includes(boardCards[i].suit) ? 'text-red-500' : 'text-white'}`}>
+                    {boardCards[i].id}
+                    <button onClick={(e) => { e.stopPropagation(); removeCard('board', boardCards[i].id); }} 
+                            className="absolute -top-1 -right-1 bg-red-500 rounded-full w-4 h-4 text-[8px]">X</button>
+                  </div>
+                ) : <span className="text-gray-700">+</span>}
+              </div>
+            ))}
+          </div>
+          
+          {/* แผงเลือกไพ่สำหรับ Board */}
+          <div className="flex flex-wrap gap-1 justify-center border-t border-gray-800 pt-3">
+            {DECK.map(card => {
+              const isUsed = [...boardCards, ...heroCards].some(c => c.id === card.id);
+              return (
+                <button key={card.id} disabled={isUsed} onClick={() => handleCardClick(card)}
+                        className={`w-[26px] h-9 rounded text-[9px] font-bold ${isUsed ? 'opacity-10 bg-black' : 'bg-gray-800 hover:bg-gray-700'}`}>
+                  <span className={['♥','♦'].includes(card.suit) ? 'text-red-400' : 'text-white'}>{card.id}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* --- ส่วนที่ 2: HERO'S HOLE CARDS --- */}
+        <div className={`p-4 rounded-xl border ${activeSelection === 'hero' ? 'border-orange-500/50 bg-[#1a1f2e]' : 'border-gray-800 bg-[#151924]'}`}
+             onClick={() => setActiveSelection('hero')}>
+          <h3 className="text-[10px] uppercase tracking-widest text-gray-400 mb-2">Hero's Hole Cards</h3>
+          <div className="flex gap-2 mb-4">
+            {[0, 1].map(i => (
+              <div key={i} className="w-12 h-16 border border-dashed border-gray-600 rounded flex items-center justify-center relative bg-gray-900/50">
+                {heroCards[i] ? (
+                  <div className={`text-lg font-bold ${['♥','♦'].includes(heroCards[i].suit) ? 'text-red-500' : 'text-white'}`}>
+                    {heroCards[i].id}
+                    <button onClick={(e) => { e.stopPropagation(); removeCard('hero', heroCards[i].id); }} 
+                            className="absolute -top-1 -right-1 bg-red-500 rounded-full w-4 h-4 text-[8px]">X</button>
+                  </div>
+                ) : <span className="text-gray-700">+</span>}
+              </div>
+            ))}
+          </div>
+          
+          {/* แผงเลือกไพ่สำหรับ Hero (กันไพ่ซ้ำเหมือนกัน) */}
+          <div className="flex flex-wrap gap-1 justify-center border-t border-gray-800 pt-3">
+            {DECK.map(card => {
+              const isUsed = [...boardCards, ...heroCards].some(c => c.id === card.id);
+              return (
+                <button key={card.id} disabled={isUsed} onClick={() => handleCardClick(card)}
+                        className={`w-[26px] h-9 rounded text-[9px] font-bold ${isUsed ? 'opacity-10 bg-black' : 'bg-gray-800 hover:bg-gray-700'}`}>
+                  <span className={['♥','♦'].includes(card.suit) ? 'text-red-400' : 'text-white'}>{card.id}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* --- ส่วนที่ 3: OPPONENT'S BET SIZE (จุดที่คุณเบลเน้น) --- */}
+        <div className="bg-[#1a1f2e] p-5 rounded-xl border border-blue-900/20">
+          <h3 className="text-gray-400 text-[10px] uppercase font-bold mb-4">Opponent's Bet Size</h3>
+          <div className="grid grid-cols-4 gap-2 mb-6">
+            {sizes.map((size) => (
+              <button key={size} onClick={() => setBetSize(size)}
+                className={`py-3 rounded-lg text-sm font-bold transition-all ${
+                  betSize === size ? 'border-2 border-orange-400 text-orange-400 shadow-[0_0_10px_rgba(251,146,60,0.2)]' : 'bg-blue-900/20 text-gray-500'
+                }`}>
+                {size}%
+              </button>
+            ))}
+            <button className="bg-red-900/20 py-3 rounded-lg text-sm font-bold text-red-400 hover:bg-red-900/40">All-in</button>
+          </div>
+
+          <div className="flex justify-between items-center">
+            <div>
+              <p className="text-gray-500 text-[10px] uppercase">Pot Odds</p>
+              <p className="text-orange-400 text-xl font-bold">{potOdds}%</p>
+            </div>
+            <div className="text-right">
+              <p className="text-gray-500 text-[10px] uppercase">Min Equity needed</p>
+              <p className="text-orange-400 text-xl font-bold">{potOdds}%</p>
+            </div>
+          </div>
+        </div>
+
+        {/* --- ปุ่ม ANALYZE RANGE --- */}
+        <button className="w-full bg-orange-500 hover:bg-orange-600 text-[#0f121a] font-black py-4 rounded-xl text-lg uppercase shadow-lg active:scale-95 transition-transform">
+          Analyze Range
+        </button>
+
+      </div>
+    </div>
+  );
+};
+
+export default PokerAnalyzerApp;
